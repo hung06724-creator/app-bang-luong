@@ -536,9 +536,113 @@ function renderEmployeesPage(req) {
       </table>
     </div>
 
+    <div class="card no-print" id="bulk-export-panel">
+      <h2 style="margin-top:0; color:#1e3a8a; font-size:18px;">Xuất hàng loạt phiếu lương</h2>
+      <div style="display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
+        <div>
+          <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">THÁNG</label>
+          <input type="number" id="bulk-month" value="${new Date().getMonth() + 1}" min="1" max="12" style="width:80px; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:15px; text-align:center;" />
+        </div>
+        <div>
+          <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">NĂM</label>
+          <input type="number" id="bulk-year" value="${new Date().getFullYear()}" min="2020" max="2099" style="width:100px; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:15px; text-align:center;" />
+        </div>
+        <button class="btn" onclick="bulkExport('pdf')" style="background:#2563eb;" id="btn-bulk-pdf">Xuất tất cả PDF</button>
+        <button class="btn" onclick="bulkExport('word')" style="background:#0ea5e9;" id="btn-bulk-word">Xuất tất cả Word</button>
+      </div>
+      <div id="bulk-progress" style="display:none;">
+        <div style="background:#e2e8f0; border-radius:8px; overflow:hidden; height:8px; margin-bottom:8px;">
+          <div id="bulk-progress-bar" style="background:#1e3a8a; height:100%; width:0%; transition:width 0.3s;"></div>
+        </div>
+        <p id="bulk-progress-text" class="muted" style="margin:0; font-size:13px;"></p>
+      </div>
+    </div>
+
     <div class="row no-print">
       <a class="btn btn-outline" href="/">Tải file khác</a>
     </div>
+
+    <script>
+      var employeeIds = ${JSON.stringify(employees.map(e => encodeURIComponent(e.employeeId || e.name)))};
+      var employeeNames = ${JSON.stringify(employees.map(e => e.name))};
+
+      function sanitizeFileName(name) {
+        return name.replace(/[<>:"\\/|?*]/g, '_').replace(/\\s+/g, ' ').trim();
+      }
+
+      function buildFileName(name, month, year, ext) {
+        return sanitizeFileName(name) + '_thang' + month + '_nam' + year + '.' + ext;
+      }
+
+      function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+      async function bulkExport(type) {
+        var month = document.getElementById('bulk-month').value;
+        var year = document.getElementById('bulk-year').value;
+        var progress = document.getElementById('bulk-progress');
+        var bar = document.getElementById('bulk-progress-bar');
+        var text = document.getElementById('bulk-progress-text');
+        var btnPdf = document.getElementById('btn-bulk-pdf');
+        var btnWord = document.getElementById('btn-bulk-word');
+
+        btnPdf.disabled = true; btnWord.disabled = true;
+        btnPdf.style.opacity = '0.5'; btnWord.style.opacity = '0.5';
+        progress.style.display = 'block';
+        bar.style.width = '0%';
+
+        for (var i = 0; i < employeeIds.length; i++) {
+          text.textContent = 'Đang xuất ' + (i + 1) + '/' + employeeIds.length + ': ' + employeeNames[i] + '...';
+          bar.style.width = ((i + 1) / employeeIds.length * 100) + '%';
+
+          try {
+            var res = await fetch('/api/slip-html/' + employeeIds[i] + '?month=' + month + '&year=' + year);
+            var slipHtml = await res.text();
+
+            var container = document.createElement('div');
+            container.innerHTML = slipHtml;
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
+            document.body.appendChild(container);
+
+            var fileName = buildFileName(employeeNames[i], month, year, type === 'pdf' ? 'pdf' : 'doc');
+
+            if (type === 'pdf') {
+              await html2pdf().set({
+                margin: 0.25,
+                filename: fileName,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+              }).from(container).save();
+            } else {
+              var htmlContent = container.innerHTML;
+              var absUrl = window.location.origin + '/logo.png';
+              htmlContent = htmlContent.replace(/src="\\/logo\\.png"/g, 'src="' + absUrl + '"');
+              var preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Phiếu Lương</title></head><body>";
+              var postHtml = "</body></html>";
+              var blob = new Blob(['\\ufeff', preHtml + htmlContent + postHtml], { type: 'application/msword' });
+              var link = document.createElement('a');
+              link.href = URL.createObjectURL(blob);
+              link.download = fileName;
+              document.body.appendChild(link);
+              link.click();
+              URL.revokeObjectURL(link.href);
+              document.body.removeChild(link);
+            }
+
+            document.body.removeChild(container);
+          } catch (err) {
+            console.error('Lỗi xuất ' + employeeNames[i] + ':', err);
+          }
+
+          await sleep(type === 'pdf' ? 800 : 300);
+        }
+
+        text.textContent = 'Hoàn tất! Đã xuất ' + employeeIds.length + ' phiếu lương.';
+        btnPdf.disabled = false; btnWord.disabled = false;
+        btnPdf.style.opacity = '1'; btnWord.style.opacity = '1';
+      }
+    </script>
   `;
 
   return renderLayout(html, "Danh sách nhân viên");
@@ -727,6 +831,97 @@ app.post("/upload", upload.single("excelFile"), (req, res) => {
 app.get("/employees", (req, res) => {
   if (!FILE_STATE.employees.length) return res.redirect("/");
   res.send(renderEmployeesPage(req));
+});
+
+app.get("/api/slip-html/:id", (req, res) => {
+  if (!FILE_STATE.employees.length) return res.status(404).send("");
+
+  const id = req.params.id || "";
+  const employee =
+    FILE_STATE.employees.find((item) => item.employeeId === id) ||
+    FILE_STATE.employees.find((item) => item.name === id);
+
+  if (!employee) return res.status(404).send("");
+
+  const month = req.query.month || (new Date().getMonth() + 1);
+  const year = req.query.year || new Date().getFullYear();
+
+  const shouldShow = (v) => v != null && v !== '' && v !== 0 && String(v).trim() !== '' && String(v).trim() !== '0';
+  const totalInsurance = employee.socialInsurance + employee.healthInsurance + employee.unemploymentInsurance;
+
+  const mainFields = [
+    { label: 'Lương', value: money(employee.salary), always: true },
+    { label: 'Phụ cấp', value: money(employee.allowance), raw: employee.allowance },
+    { label: 'Thu nhập khác', value: money(employee.otherIncome), raw: employee.otherIncome },
+    { label: 'Thưởng/Sinh nhật', value: money(employee.birthdayBonus), raw: employee.birthdayBonus },
+    { label: 'Tăng ca', value: money(employee.overtime), raw: employee.overtime },
+    { label: 'Ngày công nghỉ', value: escapeHtml(employee.daysOff), raw: employee.daysOff },
+    { label: 'Trừ tháng trước chuyển sang', value: money(employee.previousMonthCarry), raw: employee.previousMonthCarry },
+    { label: 'Trừ tạm ứng', value: money(employee.deductionAdvance), raw: employee.deductionAdvance },
+    { label: 'Trừ đã thanh toán', value: money(employee.deductionPaid), raw: employee.deductionPaid },
+    { label: 'Bảo hiểm Xã hội (BHXH, BHYT, BHTN)', value: money(totalInsurance), raw: totalInsurance },
+    { label: 'Thuế Thu nhập Cá nhân (TNCN)', value: money(employee.pitTax), raw: employee.pitTax },
+  ];
+
+  const visibleFields = mainFields.filter(f => f.always || shouldShow(f.raw));
+  const mainRows = visibleFields.map((f, i) =>
+    `<tr><td style="padding:6px;${i === 0 ? ' width:60%;' : ''}"><strong>${f.label}</strong></td><td style="padding:6px; text-align:right;">${f.value}</td></tr>`
+  ).join('');
+
+  const netRow = `<tr>
+    <td style="padding:8px; background:#e0e7ff; color:#1e3a8a; font-size:15px;"><strong>THỰC LĨNH</strong></td>
+    <td style="padding:8px; text-align:right; background:#e0e7ff; color:#1e3a8a; font-size:16px; font-weight:bold;">${money(employee.netIncome)}</td>
+  </tr>`;
+
+  let breakdownHtml = '';
+  if (employee.otherIncome > 0) {
+    const breakdownFields = [
+      { label: 'Hoa hồng tuyển sinh', raw: employee.otherIncomeBreakdown.admissionsCommission },
+      { label: 'Thưởng tết', raw: employee.otherIncomeBreakdown.tetBonus },
+      { label: 'Thưởng chức vụ', raw: employee.otherIncomeBreakdown.positionBonus },
+      { label: 'Học viên bay', raw: employee.otherIncomeBreakdown.pilotStudent },
+      { label: 'Lương dạy online/trực page', raw: employee.otherIncomeBreakdown.onlineTeaching },
+    ];
+    const breakdownRows = breakdownFields
+      .filter(f => shouldShow(f.raw))
+      .map((f, i) => `<tr><td style="padding:6px;${i === 0 ? ' width:60%;' : ''}">${f.label}</td><td style="padding:6px; text-align:right;">${money(f.raw)}</td></tr>`)
+      .join('');
+    breakdownHtml = `
+      <h3 style="border-bottom:1px solid #cbd5e1; padding-bottom:4px; margin-bottom:10px; color:#1e3a8a; font-size:15px; font-weight:bold; text-transform:uppercase;">II. CHI TIẾT THU NHẬP KHÁC</h3>
+      <table border="1" style="width:100%; border-collapse:collapse; border-color:#94a3b8;">
+        <tbody>${breakdownRows}</tbody>
+      </table>`;
+  }
+
+  const html = `
+    <div style="background:white; padding:12px 24px; font-size:14px; font-family:'Times New Roman', Times, serif;">
+      <div style="text-align:center; margin-bottom:12px; border-bottom:2px solid #1e3a8a; padding-bottom:10px;">
+        <img src="/logo.png" alt="GEOL Logo" style="max-height:56px;" onerror="this.style.display='none'" />
+        <h1 style="margin-top:8px; color:#1e3a8a; font-size:20px; text-transform:uppercase;">PHIẾU LƯƠNG NHÂN VIÊN</h1>
+      </div>
+      <div style="margin-bottom:12px;">
+        <table style="width:100%; border:none;">
+          <tr>
+            <td style="border:none; padding:2px 0; width:50%;"><strong>Họ tên:</strong> ${escapeHtml(employee.name)}</td>
+            <td style="border:none; padding:2px 0; width:50%;"><strong>Chức danh:</strong> ${escapeHtml(employee.title)}</td>
+          </tr>
+          <tr>
+            <td style="border:none; padding:2px 0;"><strong>Mã nhân viên:</strong> ${escapeHtml(employee.employeeId)}</td>
+            <td style="border:none; padding:2px 0;"><strong>Cơ sở làm việc:</strong> ${escapeHtml(employee.branch)}</td>
+          </tr>
+        </table>
+      </div>
+      <h3 style="border-bottom:1px solid #cbd5e1; padding-bottom:4px; margin-bottom:10px; color:#1e3a8a; font-size:15px; font-weight:bold; text-transform:uppercase;">I. CHI TIẾT THU NHẬP VÀ KHẤU TRỪ</h3>
+      <table border="1" style="width:100%; border-collapse:collapse; border-color:#94a3b8; margin-bottom:${employee.otherIncome > 0 ? '16px' : '30px'};">
+        <tbody>${mainRows}${netRow}</tbody>
+      </table>
+      ${breakdownHtml}
+      <div style="margin-top:${employee.otherIncome > 0 ? '16px' : '0'}; text-align:right; font-style:italic; color:#475569;">
+        Hà Nội, Ngày 15 tháng ${month} năm ${year}
+      </div>
+    </div>`;
+
+  res.send(html);
 });
 
 app.get("/slip/:id", (req, res) => {

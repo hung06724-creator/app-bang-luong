@@ -4,6 +4,8 @@ const XLSX = require("xlsx");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const archiver = require("archiver");
+const puppeteer = require("puppeteer");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -581,7 +583,13 @@ function renderEmployeesPage(req) {
         return sanitizeFileName(name).toUpperCase() + ' ' + String(month).padStart(2, '0') + '.' + year + '.' + ext;
       }
 
-      function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+      function sanitizeForFilename(name) {
+        return name.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_').trim();
+      }
+
+      function buildZipName(month, year) {
+        return 'PhieuLuong_' + String(month).padStart(2, '0') + '_' + year + '.zip';
+      }
 
       async function bulkExport(type) {
         var month = document.getElementById('bulk-month').value;
@@ -595,67 +603,68 @@ function renderEmployeesPage(req) {
         btnPdf.disabled = true; btnWord.disabled = true;
         btnPdf.style.opacity = '0.5'; btnWord.style.opacity = '0.5';
         progress.style.display = 'block';
-        bar.style.width = '0%';
+        bar.style.width = '10%';
 
-        for (var i = 0; i < employeeIds.length; i++) {
-          text.textContent = 'Đang xuất ' + (i + 1) + '/' + employeeIds.length + ': ' + employeeNames[i] + '...';
-          bar.style.width = ((i + 1) / employeeIds.length * 100) + '%';
-
+        if (type === 'pdf') {
+          // ✅ Cơ chế mới: server-side PDF dùng Puppeteer
+          text.textContent = 'Đang tạo PDF trên server (có thể mất 30-60 giây)...';
           try {
-            var res = await fetch('/api/slip-html/' + employeeIds[i] + '?month=' + month + '&year=' + year);
-            var slipHtml = await res.text();
+            var res = await fetch('/api/bulk-pdf', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: employeeIds, names: employeeNames, month: month, year: year })
+            });
 
-            var container = document.createElement('div');
-            container.innerHTML = slipHtml;
-            // ✅ Đưa container ra ngoài màn hình thay vì dùng z-index âm
-            // z-index: -9999 khiến html2canvas không nhìn thấy content → PDF trống
-            container.style.position = 'absolute';
-            container.style.left = '-9999px';
-            container.style.top = '0';
-            container.style.width = '210mm';
-            container.style.background = 'white';
-            document.body.appendChild(container);
-
-            // Chờ browser layout + ảnh tải xong (tăng từ 200ms → 600ms)
-            var imgs = container.querySelectorAll('img');
-            await Promise.all(Array.from(imgs).map(function(img) {
-              return img.complete ? Promise.resolve() : new Promise(function(r) { img.onload = r; img.onerror = r; });
-            }));
-            await new Promise(function(r) { requestAnimationFrame(function() { setTimeout(r, 600); }); });
-
-            var fileName = buildFileName(employeeNames[i], month, year, type === 'pdf' ? 'pdf' : 'doc');
-
-            if (type === 'pdf') {
-              await html2pdf().set({
-                margin: 0.25,
-                filename: fileName,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, allowTaint: true },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-              }).from(container).save();
-            } else {
-              var htmlContent = container.innerHTML;
-              var preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Phiếu Lương</title></head><body>";
-              var postHtml = "</body></html>";
-              var blob = new Blob(['\ufeff', preHtml + htmlContent + postHtml], { type: 'application/msword' });
-              var link = document.createElement('a');
-              link.href = URL.createObjectURL(blob);
-              link.download = fileName;
-              document.body.appendChild(link);
-              link.click();
-              URL.revokeObjectURL(link.href);
-              document.body.removeChild(link);
+            if (!res.ok) {
+              var errText = await res.text();
+              throw new Error(errText || 'Server error');
             }
 
-            document.body.removeChild(container);
-          } catch (err) {
-            console.error('Lỗi xuất ' + employeeNames[i] + ':', err);
-          }
+            bar.style.width = '90%';
+            text.textContent = 'Đang tải file ZIP về...';
 
-          await sleep(type === 'pdf' ? 1000 : 300);
+            var blob = await res.blob();
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = buildZipName(month, year);
+            document.body.appendChild(link);
+            link.click();
+            URL.revokeObjectURL(url);
+            document.body.removeChild(link);
+
+            bar.style.width = '100%';
+            text.textContent = 'Hoàn tất! Đã xuất ' + employeeIds.length + ' phiếu lương thành file ZIP.';
+          } catch (err) {
+            text.textContent = 'Lỗi: ' + err.message;
+            console.error(err);
+          }
+        } else {
+          // Word vẫn xuất từng file client-side (Word không cần render PDF)
+          for (var i = 0; i < employeeIds.length; i++) {
+            text.textContent = 'Đang xuất Word ' + (i + 1) + '/' + employeeIds.length + ': ' + employeeNames[i] + '...';
+            bar.style.width = ((i + 1) / employeeIds.length * 100) + '%';
+            try {
+              var res2 = await fetch('/api/slip-html/' + employeeIds[i] + '?month=' + month + '&year=' + year);
+              var slipHtml = await res2.text();
+              var preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Phieu Luong</title></head><body>";
+              var postHtml = "</body></html>";
+              var wordBlob = new Blob(['\ufeff', preHtml + slipHtml + postHtml], { type: 'application/msword' });
+              var wLink = document.createElement('a');
+              wLink.href = URL.createObjectURL(wordBlob);
+              wLink.download = sanitizeForFilename(employeeNames[i]).toUpperCase() + '_' + String(month).padStart(2, '0') + '.' + year + '.doc';
+              document.body.appendChild(wLink);
+              wLink.click();
+              URL.revokeObjectURL(wLink.href);
+              document.body.removeChild(wLink);
+            } catch (err) {
+              console.error('Lỗi Word ' + employeeNames[i] + ':', err);
+            }
+            await new Promise(r => setTimeout(r, 400));
+          }
+          text.textContent = 'Hoàn tất! Đã xuất ' + employeeIds.length + ' phiếu Word.';
         }
 
-        text.textContent = 'Hoàn tất! Đã xuất ' + employeeIds.length + ' phiếu lương.';
         btnPdf.disabled = false; btnWord.disabled = false;
         btnPdf.style.opacity = '1'; btnWord.style.opacity = '1';
       }
@@ -964,6 +973,72 @@ app.get("/slip/:id", (req, res) => {
   }
 
   res.send(renderSlipPage(employee));
+});
+
+// ─── Bulk PDF export (server-side Puppeteer) ───────────────────────────────
+app.post("/api/bulk-pdf", async (req, res) => {
+  if (!FILE_STATE.employees.length) {
+    return res.status(400).send("Chưa có dữ liệu nhân viên.");
+  }
+
+  const { ids, names, month, year } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).send("Danh sách nhân viên trống.");
+  }
+
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 794, height: 1123 }); // A4 at 96dpi
+
+    // Set up ZIP stream
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="PhieuLuong_${String(month).padStart(2,"0")}_${year}.zip"`
+    );
+
+    const archive = archiver("zip", { zlib: { level: 6 } });
+    archive.on("error", (err) => { throw err; });
+    archive.pipe(res);
+
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const name = names[i] || id;
+
+      const url = `http://localhost:${PORT}/api/slip-html/${id}?month=${month}&year=${year}`;
+      await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 });
+
+      // Inject print-friendly wrapper style
+      await page.addStyleTag({
+        content: `body { margin: 0; padding: 0; background: white; font-family: 'Times New Roman', serif; }`
+      });
+
+      const pdfBuffer = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        margin: { top: "12mm", bottom: "12mm", left: "12mm", right: "12mm" },
+      });
+
+      const safeName = name.replace(/[<>:"/\\|?*]/g, "_");
+      const fileName = `${safeName}_${String(month).padStart(2, "0")}.${year}.pdf`;
+      archive.append(Buffer.from(pdfBuffer), { name: fileName });
+    }
+
+    await browser.close();
+    await archive.finalize();
+  } catch (err) {
+    console.error("[bulk-pdf] Lỗi:", err.message);
+    if (browser) await browser.close().catch(() => {});
+    if (!res.headersSent) {
+      res.status(500).send("Lỗi tạo PDF: " + err.message);
+    }
+  }
 });
 
 if (process.env.NODE_ENV !== "production") {

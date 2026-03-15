@@ -576,39 +576,64 @@ function renderSlipPage(employee) {
         </table>
       </div>
 
-      <h3 style="border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 10px; color: #1e3a8a; font-size: 15px; font-weight: bold; text-transform: uppercase;">I. CHI TIẾT THU NHẬP VÀ KHẤU TRỪ</h3>
-      <table border="1" style="width: 100%; border-collapse: collapse; border-color: #94a3b8; margin-bottom: ${employee.otherIncome > 0 ? '16px' : '30px'};">
-        <tbody>
-          <tr><td style="padding: 6px; width: 60%;"><strong>Lương</strong></td><td style="padding: 6px; text-align: right;">${money(employee.salary)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Phụ cấp</strong></td><td style="padding: 6px; text-align: right;">${money(employee.allowance)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Thu nhập khác</strong></td><td style="padding: 6px; text-align: right;">${money(employee.otherIncome)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Thưởng/Sinh nhật</strong></td><td style="padding: 6px; text-align: right;">${money(employee.birthdayBonus)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Tăng ca</strong></td><td style="padding: 6px; text-align: right;">${money(employee.overtime)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Ngày công nghỉ</strong></td><td style="padding: 6px; text-align: right;">${escapeHtml(employee.daysOff)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Trừ tháng trước chuyển sang</strong></td><td style="padding: 6px; text-align: right;">${money(employee.previousMonthCarry)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Trừ tạm ứng</strong></td><td style="padding: 6px; text-align: right;">${money(employee.deductionAdvance)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Trừ đã thanh toán</strong></td><td style="padding: 6px; text-align: right;">${money(employee.deductionPaid)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Bảo hiểm Xã hội (BHXH, BHYT, BHTN)</strong></td><td style="padding: 6px; text-align: right;">${money(employee.socialInsurance + employee.healthInsurance + employee.unemploymentInsurance)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Thuế Thu nhập Cá nhân (TNCN)</strong></td><td style="padding: 6px; text-align: right;">${money(employee.pitTax)}</td></tr>
-          <tr>
+      ${(() => {
+        const shouldShow = (v) => v != null && v !== '' && v !== 0 && String(v).trim() !== '' && String(v).trim() !== '0';
+        const totalInsurance = employee.socialInsurance + employee.healthInsurance + employee.unemploymentInsurance;
+
+        const mainFields = [
+          { label: 'Lương', value: money(employee.salary), always: true },
+          { label: 'Phụ cấp', value: money(employee.allowance), raw: employee.allowance },
+          { label: 'Thu nhập khác', value: money(employee.otherIncome), raw: employee.otherIncome },
+          { label: 'Thưởng/Sinh nhật', value: money(employee.birthdayBonus), raw: employee.birthdayBonus },
+          { label: 'Tăng ca', value: money(employee.overtime), raw: employee.overtime },
+          { label: 'Ngày công nghỉ', value: escapeHtml(employee.daysOff), raw: employee.daysOff, isMoney: false },
+          { label: 'Trừ tháng trước chuyển sang', value: money(employee.previousMonthCarry), raw: employee.previousMonthCarry },
+          { label: 'Trừ tạm ứng', value: money(employee.deductionAdvance), raw: employee.deductionAdvance },
+          { label: 'Trừ đã thanh toán', value: money(employee.deductionPaid), raw: employee.deductionPaid },
+          { label: 'Bảo hiểm Xã hội (BHXH, BHYT, BHTN)', value: money(totalInsurance), raw: totalInsurance },
+          { label: 'Thuế Thu nhập Cá nhân (TNCN)', value: money(employee.pitTax), raw: employee.pitTax },
+        ];
+
+        const visibleFields = mainFields.filter(f => f.always || shouldShow(f.raw));
+
+        const rows = visibleFields.map(f =>
+          `<tr><td style="padding: 6px;${f === visibleFields[0] ? ' width: 60%;' : ''}"><strong>${f.label}</strong></td><td style="padding: 6px; text-align: right;">${f.value}</td></tr>`
+        ).join('');
+
+        const netRow = `<tr>
             <td style="padding: 8px; background: #e0e7ff; color: #1e3a8a; font-size: 15px;"><strong>THỰC LĨNH</strong></td>
             <td style="padding: 8px; text-align: right; background: #e0e7ff; color: #1e3a8a; font-size: 16px; font-weight: bold;">${money(employee.netIncome)}</td>
-          </tr>
-        </tbody>
-      </table>
+          </tr>`;
 
-      ${employee.otherIncome > 0 ? `
+        let result = `<h3 style="border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 10px; color: #1e3a8a; font-size: 15px; font-weight: bold; text-transform: uppercase;">I. CHI TIẾT THU NHẬP VÀ KHẤU TRỪ</h3>
+      <table border="1" style="width: 100%; border-collapse: collapse; border-color: #94a3b8; margin-bottom: ${employee.otherIncome > 0 ? '16px' : '30px'};">
+        <tbody>${rows}${netRow}</tbody>
+      </table>`;
+
+        if (employee.otherIncome > 0) {
+          const breakdownFields = [
+            { label: 'Hoa hồng tuyển sinh', raw: employee.otherIncomeBreakdown.admissionsCommission },
+            { label: 'Thưởng tết', raw: employee.otherIncomeBreakdown.tetBonus },
+            { label: 'Thưởng chức vụ', raw: employee.otherIncomeBreakdown.positionBonus },
+            { label: 'Học viên bay', raw: employee.otherIncomeBreakdown.pilotStudent },
+            { label: 'Lương dạy online/trực page', raw: employee.otherIncomeBreakdown.onlineTeaching },
+          ];
+
+          const breakdownRows = breakdownFields
+            .filter(f => shouldShow(f.raw))
+            .map((f, i) =>
+              `<tr><td style="padding: 6px;${i === 0 ? ' width: 60%;' : ''}">${f.label}</td><td style="padding: 6px; text-align: right;">${money(f.raw)}</td></tr>`
+            ).join('');
+
+          result += `
       <h3 style="border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 10px; color: #1e3a8a; font-size: 15px; font-weight: bold; text-transform: uppercase;">II. CHI TIẾT THU NHẬP KHÁC</h3>
       <table border="1" style="width: 100%; border-collapse: collapse; border-color: #94a3b8;">
-        <tbody>
-          <tr><td style="padding: 6px; width: 60%;">Hoa hồng tuyển sinh</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.admissionsCommission)}</td></tr>
-          <tr><td style="padding: 6px;">Thưởng tết</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.tetBonus)}</td></tr>
-          <tr><td style="padding: 6px;">Thưởng chức vụ</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.positionBonus)}</td></tr>
-          <tr><td style="padding: 6px;">Học viên bay</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.pilotStudent)}</td></tr>
-          <tr><td style="padding: 6px;">Lương dạy online/trực page</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.onlineTeaching)}</td></tr>
-        </tbody>
-      </table>
-      ` : ''}
+        <tbody>${breakdownRows}</tbody>
+      </table>`;
+        }
+
+        return result;
+      })()}
       
       <div style="margin-top: ${employee.otherIncome > 0 ? '16px' : '0'}; text-align: right; font-style: italic; color: #475569;">
         Hà Nội, Ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}

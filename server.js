@@ -634,7 +634,7 @@ function renderSlipPage(employee) {
         
         // Fix image path for Word (convert relative /logo.png to absolute URL so Word can handle it properly online)
         const absoluteUrl = window.location.origin + '/logo.png';
-        htmlContent = htmlContent.replace(/src="\/logo\.png"/g, 'src="' + absoluteUrl + '"');
+        htmlContent = htmlContent.replace(/src="\\/logo\\.png"/g, 'src="' + absoluteUrl + '"');
 
         // Prepend word schema
         const preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Phiếu Lương</title></head><body>";

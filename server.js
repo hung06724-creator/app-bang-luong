@@ -732,7 +732,7 @@ app.get("/employees", (req, res) => {
 app.get("/slip/:id", (req, res) => {
   if (!FILE_STATE.employees.length) return res.redirect("/");
 
-  const id = decodeURIComponent(req.params.id || "");
+  const id = req.params.id || "";
   const employee =
     FILE_STATE.employees.find((item) => item.employeeId === id) ||
     FILE_STATE.employees.find((item) => item.name === id);

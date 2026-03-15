@@ -574,7 +574,7 @@ function renderEmployeesPage(req) {
       var employeeNames = ${JSON.stringify(employees.map(e => e.name))};
 
       function sanitizeFileName(name) {
-        return name.replace(/[<>:"\\/|?*]/g, '_').replace(/\\s+/g, ' ').trim();
+        return name.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, ' ').trim();
       }
 
       function buildFileName(name, month, year, ext) {
@@ -607,20 +607,21 @@ function renderEmployeesPage(req) {
 
             var container = document.createElement('div');
             container.innerHTML = slipHtml;
-            container.style.position = 'fixed';
-            container.style.left = '0';
+            // ✅ Đưa container ra ngoài màn hình thay vì dùng z-index âm
+            // z-index: -9999 khiến html2canvas không nhìn thấy content → PDF trống
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
             container.style.top = '0';
             container.style.width = '210mm';
-            container.style.zIndex = '-9999';
-            container.style.pointerEvents = 'none';
+            container.style.background = 'white';
             document.body.appendChild(container);
 
-            // Wait for browser to render + images to load
+            // Chờ browser layout + ảnh tải xong (tăng từ 200ms → 600ms)
             var imgs = container.querySelectorAll('img');
             await Promise.all(Array.from(imgs).map(function(img) {
               return img.complete ? Promise.resolve() : new Promise(function(r) { img.onload = r; img.onerror = r; });
             }));
-            await new Promise(function(r) { requestAnimationFrame(function() { setTimeout(r, 200); }); });
+            await new Promise(function(r) { requestAnimationFrame(function() { setTimeout(r, 600); }); });
 
             var fileName = buildFileName(employeeNames[i], month, year, type === 'pdf' ? 'pdf' : 'doc');
 
@@ -629,14 +630,14 @@ function renderEmployeesPage(req) {
                 margin: 0.25,
                 filename: fileName,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
+                html2canvas: { scale: 2, useCORS: true, allowTaint: true },
                 jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
               }).from(container).save();
             } else {
               var htmlContent = container.innerHTML;
               var preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Phiếu Lương</title></head><body>";
               var postHtml = "</body></html>";
-              var blob = new Blob(['\\ufeff', preHtml + htmlContent + postHtml], { type: 'application/msword' });
+              var blob = new Blob(['\ufeff', preHtml + htmlContent + postHtml], { type: 'application/msword' });
               var link = document.createElement('a');
               link.href = URL.createObjectURL(blob);
               link.download = fileName;
@@ -651,7 +652,7 @@ function renderEmployeesPage(req) {
             console.error('Lỗi xuất ' + employeeNames[i] + ':', err);
           }
 
-          await sleep(type === 'pdf' ? 800 : 300);
+          await sleep(type === 'pdf' ? 1000 : 300);
         }
 
         text.textContent = 'Hoàn tất! Đã xuất ' + employeeIds.length + ' phiếu lương.';

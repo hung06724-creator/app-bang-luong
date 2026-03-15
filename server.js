@@ -584,6 +584,19 @@ function renderEmployeesPage(req) {
 
       function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
+      function renderInIframe(htmlContent) {
+        return new Promise(function(resolve) {
+          var iframe = document.createElement('iframe');
+          iframe.style.cssText = 'position:fixed;left:-9999px;width:794px;height:1123px;border:none;';
+          document.body.appendChild(iframe);
+          var doc = iframe.contentDocument || iframe.contentWindow.document;
+          doc.open();
+          doc.write('<!doctype html><html><head><style>body{margin:0;padding:0;background:white;}</style></head><body>' + htmlContent + '</body></html>');
+          doc.close();
+          iframe.onload = function() { setTimeout(function() { resolve({ iframe: iframe, element: doc.body.firstElementChild || doc.body }); }, 400); };
+        });
+      }
+
       async function bulkExport(type) {
         var month = document.getElementById('bulk-month').value;
         var year = document.getElementById('bulk-year').value;
@@ -609,13 +622,23 @@ function renderEmployeesPage(req) {
             var fileName = buildFileName(employeeNames[i], month, year, type === 'pdf' ? 'pdf' : 'doc');
 
             if (type === 'pdf') {
+              var rendered = await renderInIframe(slipHtml);
+              var clone = rendered.element.cloneNode(true);
+              clone.style.width = '794px';
+              clone.style.background = 'white';
+              document.body.appendChild(clone);
+              await new Promise(function(r) { requestAnimationFrame(function() { setTimeout(r, 300); }); });
+
               await html2pdf().set({
                 margin: 0.25,
                 filename: fileName,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2 },
                 jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-              }).from(slipHtml, 'string').save();
+              }).from(clone).save();
+
+              document.body.removeChild(clone);
+              document.body.removeChild(rendered.iframe);
             } else {
               var preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Phieu Luong</title></head><body>";
               var postHtml = "</body></html>";
@@ -632,7 +655,7 @@ function renderEmployeesPage(req) {
             console.error('Lỗi xuất ' + employeeNames[i] + ':', err);
           }
 
-          await sleep(type === 'pdf' ? 1000 : 400);
+          await sleep(type === 'pdf' ? 500 : 400);
         }
 
         text.textContent = 'Hoàn tất! Đã xuất ' + employeeIds.length + ' phiếu ' + (type === 'pdf' ? 'PDF' : 'Word') + '.';

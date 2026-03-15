@@ -584,16 +584,24 @@ function renderEmployeesPage(req) {
 
       function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
-      function renderInIframe(htmlContent) {
+      function exportPdfViaIframe(employeeId, fileName, month, year) {
         return new Promise(function(resolve) {
           var iframe = document.createElement('iframe');
-          iframe.style.cssText = 'position:fixed;left:-9999px;width:794px;height:1123px;border:none;';
+          iframe.style.cssText = 'position:fixed;left:0;top:0;width:794px;height:1123px;border:none;opacity:0;pointer-events:none;';
+          var url = '/slip-export/' + employeeId + '?month=' + month + '&year=' + year + '&filename=' + encodeURIComponent(fileName);
+          iframe.src = url;
+
+          function onMessage(e) {
+            if (e.data === 'export-done') {
+              window.removeEventListener('message', onMessage);
+              setTimeout(function() {
+                document.body.removeChild(iframe);
+                resolve();
+              }, 200);
+            }
+          }
+          window.addEventListener('message', onMessage);
           document.body.appendChild(iframe);
-          var doc = iframe.contentDocument || iframe.contentWindow.document;
-          doc.open();
-          doc.write('<!doctype html><html><head><style>body{margin:0;padding:0;background:white;}</style></head><body>' + htmlContent + '</body></html>');
-          doc.close();
-          iframe.onload = function() { setTimeout(function() { resolve({ iframe: iframe, element: doc.body.firstElementChild || doc.body }); }, 400); };
         });
       }
 
@@ -616,30 +624,14 @@ function renderEmployeesPage(req) {
           text.textContent = 'Đang xuất ' + label + ' ' + (i + 1) + '/' + employeeIds.length + ': ' + employeeNames[i] + '...';
           bar.style.width = ((i + 1) / employeeIds.length * 100) + '%';
 
+          var fileName = buildFileName(employeeNames[i], month, year, type === 'pdf' ? 'pdf' : 'doc');
+
           try {
-            var res = await fetch('/api/slip-html/' + employeeIds[i] + '?month=' + month + '&year=' + year);
-            var slipHtml = await res.text();
-            var fileName = buildFileName(employeeNames[i], month, year, type === 'pdf' ? 'pdf' : 'doc');
-
             if (type === 'pdf') {
-              var rendered = await renderInIframe(slipHtml);
-              var clone = rendered.element.cloneNode(true);
-              clone.style.width = '794px';
-              clone.style.background = 'white';
-              document.body.appendChild(clone);
-              await new Promise(function(r) { requestAnimationFrame(function() { setTimeout(r, 300); }); });
-
-              await html2pdf().set({
-                margin: 0.25,
-                filename: fileName,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-              }).from(clone).save();
-
-              document.body.removeChild(clone);
-              document.body.removeChild(rendered.iframe);
+              await exportPdfViaIframe(employeeIds[i], fileName, month, year);
             } else {
+              var res = await fetch('/api/slip-html/' + employeeIds[i] + '?month=' + month + '&year=' + year);
+              var slipHtml = await res.text();
               var preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Phieu Luong</title></head><body>";
               var postHtml = "</body></html>";
               var blob = new Blob(['\\ufeff', preHtml + slipHtml + postHtml], { type: 'application/msword' });
@@ -650,12 +642,11 @@ function renderEmployeesPage(req) {
               link.click();
               URL.revokeObjectURL(link.href);
               document.body.removeChild(link);
+              await sleep(400);
             }
           } catch (err) {
             console.error('Lỗi xuất ' + employeeNames[i] + ':', err);
           }
-
-          await sleep(type === 'pdf' ? 500 : 400);
         }
 
         text.textContent = 'Hoàn tất! Đã xuất ' + employeeIds.length + ' phiếu ' + (type === 'pdf' ? 'PDF' : 'Word') + '.';
@@ -940,6 +931,120 @@ app.get("/api/slip-html/:id", (req, res) => {
         Hà Nội, Ngày 15 tháng ${month} năm ${year}
       </div>
     </div>`;
+
+  res.send(html);
+});
+
+app.get("/slip-export/:id", (req, res) => {
+  if (!FILE_STATE.employees.length) return res.status(404).send("");
+
+  const id = req.params.id || "";
+  const employee =
+    FILE_STATE.employees.find((item) => item.employeeId === id) ||
+    FILE_STATE.employees.find((item) => item.name === id);
+
+  if (!employee) return res.status(404).send("");
+
+  const month = req.query.month || (new Date().getMonth() + 1);
+  const year = req.query.year || new Date().getFullYear();
+  const fileName = req.query.filename || "phieu_luong.pdf";
+
+  const shouldShow = (v) => v != null && v !== '' && v !== 0 && String(v).trim() !== '' && String(v).trim() !== '0';
+  const totalInsurance = employee.socialInsurance + employee.healthInsurance + employee.unemploymentInsurance;
+
+  const mainFields = [
+    { label: 'Lương', value: money(employee.salary), always: true },
+    { label: 'Phụ cấp', value: money(employee.allowance), raw: employee.allowance },
+    { label: 'Thu nhập khác', value: money(employee.otherIncome), raw: employee.otherIncome },
+    { label: 'Thưởng/Sinh nhật', value: money(employee.birthdayBonus), raw: employee.birthdayBonus },
+    { label: 'Tăng ca', value: money(employee.overtime), raw: employee.overtime },
+    { label: 'Ngày công nghỉ', value: escapeHtml(employee.daysOff), raw: employee.daysOff },
+    { label: 'Trừ tháng trước chuyển sang', value: money(employee.previousMonthCarry), raw: employee.previousMonthCarry },
+    { label: 'Trừ tạm ứng', value: money(employee.deductionAdvance), raw: employee.deductionAdvance },
+    { label: 'Trừ đã thanh toán', value: money(employee.deductionPaid), raw: employee.deductionPaid },
+    { label: 'Bảo hiểm Xã hội (BHXH, BHYT, BHTN)', value: money(totalInsurance), raw: totalInsurance },
+    { label: 'Thuế Thu nhập Cá nhân (TNCN)', value: money(employee.pitTax), raw: employee.pitTax },
+  ];
+
+  const visibleFields = mainFields.filter(f => f.always || shouldShow(f.raw));
+  const mainRows = visibleFields.map((f, i) =>
+    `<tr><td style="padding:6px;${i === 0 ? ' width:60%;' : ''}"><strong>${f.label}</strong></td><td style="padding:6px; text-align:right;">${f.value}</td></tr>`
+  ).join('');
+
+  const netRow = `<tr>
+    <td style="padding:8px; background:#e0e7ff; color:#1e3a8a; font-size:15px;"><strong>THỰC LĨNH</strong></td>
+    <td style="padding:8px; text-align:right; background:#e0e7ff; color:#1e3a8a; font-size:16px; font-weight:bold;">${money(employee.netIncome)}</td>
+  </tr>`;
+
+  let breakdownHtml = '';
+  if (employee.otherIncome > 0) {
+    const breakdownFields = [
+      { label: 'Hoa hồng tuyển sinh', raw: employee.otherIncomeBreakdown.admissionsCommission },
+      { label: 'Thưởng tết', raw: employee.otherIncomeBreakdown.tetBonus },
+      { label: 'Thưởng chức vụ', raw: employee.otherIncomeBreakdown.positionBonus },
+      { label: 'Học viên bay', raw: employee.otherIncomeBreakdown.pilotStudent },
+      { label: 'Lương dạy online/trực page', raw: employee.otherIncomeBreakdown.onlineTeaching },
+    ];
+    const breakdownRows = breakdownFields
+      .filter(f => shouldShow(f.raw))
+      .map((f, i) => `<tr><td style="padding:6px;${i === 0 ? ' width:60%;' : ''}">${f.label}</td><td style="padding:6px; text-align:right;">${money(f.raw)}</td></tr>`)
+      .join('');
+    breakdownHtml = `
+      <h3 style="border-bottom:1px solid #cbd5e1; padding-bottom:4px; margin-bottom:10px; color:#1e3a8a; font-size:15px; font-weight:bold; text-transform:uppercase;">II. CHI TIẾT THU NHẬP KHÁC</h3>
+      <table border="1" style="width:100%; border-collapse:collapse; border-color:#94a3b8;">
+        <tbody>${breakdownRows}</tbody>
+      </table>`;
+  }
+
+  const html = `<!doctype html>
+<html><head>
+<meta charset="UTF-8"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body style="margin:0; background:white;">
+<div id="content" style="padding:12px 24px; font-size:14px; font-family:'Times New Roman', Times, serif;">
+  <div style="text-align:center; margin-bottom:12px; border-bottom:2px solid #1e3a8a; padding-bottom:10px;">
+    ${LOGO_BASE64 ? `<img src="${LOGO_BASE64}" alt="GEOL Logo" style="max-height:56px;" />` : ''}
+    <h1 style="margin-top:8px; color:#1e3a8a; font-size:20px; text-transform:uppercase;">PHIẾU LƯƠNG NHÂN VIÊN</h1>
+  </div>
+  <div style="margin-bottom:12px;">
+    <table style="width:100%; border:none;">
+      <tr>
+        <td style="border:none; padding:2px 0; width:50%;"><strong>Họ tên:</strong> ${escapeHtml(employee.name)}</td>
+        <td style="border:none; padding:2px 0; width:50%;"><strong>Chức danh:</strong> ${escapeHtml(employee.title)}</td>
+      </tr>
+      <tr>
+        <td style="border:none; padding:2px 0;"><strong>Mã nhân viên:</strong> ${escapeHtml(employee.employeeId)}</td>
+        <td style="border:none; padding:2px 0;"><strong>Cơ sở làm việc:</strong> ${escapeHtml(employee.branch)}</td>
+      </tr>
+    </table>
+  </div>
+  <h3 style="border-bottom:1px solid #cbd5e1; padding-bottom:4px; margin-bottom:10px; color:#1e3a8a; font-size:15px; font-weight:bold; text-transform:uppercase;">I. CHI TIẾT THU NHẬP VÀ KHẤU TRỪ</h3>
+  <table border="1" style="width:100%; border-collapse:collapse; border-color:#94a3b8; margin-bottom:${employee.otherIncome > 0 ? '16px' : '30px'};">
+    <tbody>${mainRows}${netRow}</tbody>
+  </table>
+  ${breakdownHtml}
+  <div style="margin-top:${employee.otherIncome > 0 ? '16px' : '0'}; text-align:right; font-style:italic; color:#475569;">
+    Hà Nội, Ngày 15 tháng ${month} năm ${year}
+  </div>
+</div>
+<script>
+window.onload = function() {
+  setTimeout(function() {
+    var el = document.getElementById('content');
+    html2pdf().set({
+      margin: 0.25,
+      filename: ${JSON.stringify(fileName)},
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    }).from(el).save().then(function() {
+      window.parent.postMessage('export-done', '*');
+    });
+  }, 600);
+};
+</script>
+</body></html>`;
 
   res.send(html);
 });

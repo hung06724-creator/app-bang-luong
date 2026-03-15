@@ -271,8 +271,10 @@ app.get("/slip/:index", (req, res) => {
   }
 
   const shouldShow = (value) => {
-    if (value === 0 || value === "0" || value === "" || value == null) return false;
-    return true;
+    if (value == null) return false;
+    if (typeof value === "number") return value !== 0;
+    const trimmed = String(value).trim();
+    return trimmed !== "" && trimmed !== "0";
   };
 
   const fields = [

@@ -13,6 +13,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static("public"));
 
+let LOGO_BASE64 = "";
+try {
+  const logoPath = path.join(__dirname, "public", "logo.png");
+  const logoBuffer = fs.readFileSync(logoPath);
+  LOGO_BASE64 = "data:image/png;base64," + logoBuffer.toString("base64");
+} catch (e) { /* no logo */ }
+
 const FILE_STATE = {
   workbookName: "",
   sheetName: "",
@@ -571,7 +578,7 @@ function renderEmployeesPage(req) {
       }
 
       function buildFileName(name, month, year, ext) {
-        return sanitizeFileName(name) + '_thang' + month + '_nam' + year + '.' + ext;
+        return sanitizeFileName(name).toUpperCase() + ' ' + String(month).padStart(2, '0') + '.' + year + '.' + ext;
       }
 
       function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -600,8 +607,12 @@ function renderEmployeesPage(req) {
 
             var container = document.createElement('div');
             container.innerHTML = slipHtml;
-            container.style.position = 'absolute';
-            container.style.left = '-9999px';
+            container.style.position = 'fixed';
+            container.style.left = '0';
+            container.style.top = '0';
+            container.style.width = '210mm';
+            container.style.zIndex = '-9999';
+            container.style.pointerEvents = 'none';
             document.body.appendChild(container);
 
             var fileName = buildFileName(employeeNames[i], month, year, type === 'pdf' ? 'pdf' : 'doc');
@@ -616,8 +627,6 @@ function renderEmployeesPage(req) {
               }).from(container).save();
             } else {
               var htmlContent = container.innerHTML;
-              var absUrl = window.location.origin + '/logo.png';
-              htmlContent = htmlContent.replace(/src="\\/logo\\.png"/g, 'src="' + absUrl + '"');
               var preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Phiếu Lương</title></head><body>";
               var postHtml = "</body></html>";
               var blob = new Blob(['\\ufeff', preHtml + htmlContent + postHtml], { type: 'application/msword' });
@@ -896,7 +905,7 @@ app.get("/api/slip-html/:id", (req, res) => {
   const html = `
     <div style="background:white; padding:12px 24px; font-size:14px; font-family:'Times New Roman', Times, serif;">
       <div style="text-align:center; margin-bottom:12px; border-bottom:2px solid #1e3a8a; padding-bottom:10px;">
-        <img src="/logo.png" alt="GEOL Logo" style="max-height:56px;" onerror="this.style.display='none'" />
+        ${LOGO_BASE64 ? `<img src="${LOGO_BASE64}" alt="GEOL Logo" style="max-height:56px;" />` : ''}
         <h1 style="margin-top:8px; color:#1e3a8a; font-size:20px; text-transform:uppercase;">PHIẾU LƯƠNG NHÂN VIÊN</h1>
       </div>
       <div style="margin-bottom:12px;">

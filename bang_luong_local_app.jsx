@@ -88,7 +88,7 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function buildEmployee(row, mapping) {
+function buildEmployee(row, mapping, rowNumber, sheet) {
   return {
     name: row[mapping.name] || "",
     salary: toNumber(row[mapping.salary]),
@@ -97,7 +97,7 @@ function buildEmployee(row, mapping) {
     birthdayBonus: toNumber(row[mapping.birthdayBonus]),
     overtime: toNumber(row[mapping.overtime]),
     daysOff: row[mapping.daysOff] || "",
-    advanceDeduction: toNumber(row[mapping.advanceDeduction]),
+    advanceDeduction: toNumber(sheet?.['R' + rowNumber]?.v),
     paidDeduction: toNumber(row[mapping.paidDeduction]),
     socialInsurance: toNumber(row[mapping.socialInsurance]),
     pitTax: toNumber(row[mapping.pitTax]),
@@ -201,7 +201,7 @@ app.post("/upload", upload.single("excelFile"), (req, res) => {
   }, {});
 
   const employees = rows
-    .map((row) => buildEmployee(row, mapping))
+    .map((row, i) => buildEmployee(row, mapping, i + 2, sheet))
     .filter((item) => item.name);
 
   payrollData = { headers, rows, mapping, employees };
@@ -290,7 +290,7 @@ app.get("/slip/:index", (req, res) => {
         <div class="item"><div class="label">Thưởng/Sinh nhật</div><div class="value">${money(employee.birthdayBonus)}</div></div>
         <div class="item"><div class="label">Tăng ca</div><div class="value">${money(employee.overtime)}</div></div>
         <div class="item"><div class="label">Ngày công nghỉ</div><div class="value">${employee.daysOff || 0}</div></div>
-        <div class="item"><div class="label">Trừ tạm ứng</div><div class="value">${money(employee.paidDeduction)}</div></div>
+        <div class="item"><div class="label">Trừ tạm ứng</div><div class="value">${money(employee.advanceDeduction)}</div></div>
         <div class="item"><div class="label">Trừ đã TT</div><div class="value">${money(employee.paidDeduction)}</div></div>
         <div class="item"><div class="label">BHXH</div><div class="value">${money(employee.socialInsurance)}</div></div>
         <div class="item"><div class="label">Thuế TNCN</div><div class="value">${money(employee.pitTax)}</div></div>

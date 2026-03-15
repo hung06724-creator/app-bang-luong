@@ -259,83 +259,98 @@ function parsePayrollFile(filePath, originalName) {
   FILE_STATE.branches = branches;
 }
 
-function renderLayout(content, title = "Bảng lương local") {
+function renderLayout(content, title = "Bảng lương GEOL") {
   return `<!doctype html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(title)}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: Arial, sans-serif; background: #f8fafc; color: #0f172a; }
-    .wrap { max-width: 1180px; margin: 0 auto; padding: 24px; }
-    .card { background: #fff; border-radius: 18px; padding: 20px; margin-bottom: 18px; box-shadow: 0 1px 10px rgba(15, 23, 42, 0.08); }
-    .title { font-size: 28px; font-weight: 700; margin: 0 0 10px; }
-    .muted { color: #64748b; }
+    body { margin: 0; font-family: 'Inter', Arial, sans-serif; background: #f0f4f8; color: #1e293b; line-height: 1.5; }
+    
+    .header { background: #ffffff; padding: 12px 24px; color: #1e3a8a; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-bottom: 3px solid #ca8a04; position: sticky; top: 0; z-index: 50; }
+    .header-inner { max-width: 1180px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .header-left { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 20px; letter-spacing: 0.5px; }
+    .header-logo { max-height: 48px; border-radius: 8px; }
+    .header-link { color: #1e3a8a; text-decoration: none; font-weight: 600; font-size: 15px; padding: 8px 16px; border-radius: 8px; background: #f8fafc; transition: all 0.2s; border: 1px solid #e2e8f0; }
+    .header-link:hover { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+
+    .wrap { max-width: 1180px; margin: 32px auto; padding: 0 24px; }
+    .card { background: #fff; border-radius: 16px; padding: 32px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); border: 1px solid #e2e8f0; }
+    
+    .title { font-size: 24px; font-weight: 700; margin: 0 0 8px; color: #1e3a8a; }
+    .muted { color: #64748b; font-size: 15px; }
     .row { display: flex; gap: 12px; flex-wrap: wrap; }
-    .grid { display: grid; gap: 14px; }
+    .grid { display: grid; gap: 16px; }
     .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .stat { background: #f8fafc; border-radius: 14px; padding: 16px; }
-    .stat .label { font-size: 13px; color: #64748b; }
-    .stat .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
-    .btn { display: inline-block; text-decoration: none; border: none; background: #0f172a; color: white; padding: 10px 14px; border-radius: 12px; cursor: pointer; }
-    .btn-outline { background: white; color: #0f172a; border: 1px solid #cbd5e1; }
-    input[type=file], input[type=text], select {
+    
+    .stat { background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border-radius: 16px; padding: 20px; border: 1px solid #e2e8f0; border-left: 4px solid #ca8a04; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+    .stat .label { font-size: 13px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat .value { font-size: 28px; font-weight: 700; margin-top: 8px; color: #1e3a8a; }
+    
+    .btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; border: none; background: #ca8a04; color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 15px; transition: all 0.2s ease; }
+    .btn:hover { background: #b47a03; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(202, 138, 4, 0.2); }
+    .btn-blue { background: #1e3a8a; }
+    .btn-blue:hover { background: #172554; box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2); }
+    .btn-outline { background: white; color: #1e3a8a; border: 1px solid #cbd5e1; }
+    .btn-outline:hover { background: #f8fafc; color: #1d4ed8; border-color: #94a3b8; }
+    
+    input[type=file]::file-selector-button { background: #e0e7ff; background: #1e3a8a; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 500; cursor: pointer; margin-right: 12px; transition: background 0.2s; }
+    input[type=file]::file-selector-button:hover { background: #172554; }
+    
+    input[type=text], select, input[type=file] {
       width: 100%;
-      padding: 11px 12px;
-      border-radius: 12px;
+      padding: 12px 16px;
+      border-radius: 8px;
       border: 1px solid #cbd5e1;
-    }
-    table { width: 100%; border-collapse: collapse; }
-    th, td {
-      padding: 12px;
-      border-bottom: 1px solid #e2e8f0;
-      text-align: left;
-      vertical-align: top;
-    }
-    th { background: #f8fafc; }
-    .pill {
-      display: inline-block;
-      background: #e2e8f0;
-      color: #0f172a;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: 13px;
-      margin-right: 8px;
-      margin-bottom: 8px;
-    }
-    .pay-grid {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .pay-item {
       background: #f8fafc;
-      border-radius: 14px;
-      padding: 14px;
+      font-size: 15px;
+      font-family: inherit;
+      transition: all 0.2s;
     }
-    .pay-item .k { color: #64748b; font-size: 13px; }
-    .pay-item .v { font-weight: 700; margin-top: 6px; }
-    .pay-item.highlight { background: #0f172a; color: white; }
-    .pay-item.highlight .k { color: #cbd5e1; }
-    .small { font-size: 13px; }
-
+    input[type=text]:focus, select:focus { outline: none; border-color: #1e3a8a; background: #fff; box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1); }
+    
+    table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    th, td { padding: 14px 16px; text-align: left; vertical-align: middle; border-bottom: 1px solid #f1f5f9; }
+    th { background: #f8fafc; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 13px; border-bottom: 2px solid #e2e8f0; border-top: 1px solid #e2e8f0; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+    
+    .pill { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; margin-right: 8px; margin-bottom: 8px; border: 1px solid #c7d2fe; }
+    
     @media (max-width: 800px) {
-      .grid-2, .grid-3, .pay-grid { grid-template-columns: 1fr; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .wrap { padding: 16px; margin: 0 auto; }
+      .card { padding: 20px; }
+      .header-inner { flex-direction: row; gap: 12px; }
+      .header-left span { display: none; }
     }
 
     @media print {
-      .no-print { display: none !important; }
+      .no-print, .header { display: none !important; }
       body { background: white; }
-      .card { box-shadow: none; padding: 0; }
-      .wrap { max-width: 100%; padding: 0; }
+      .card { box-shadow: none; padding: 0; margin: 0; border: none; }
+      .wrap { max-width: 100%; padding: 0; margin: 0; }
     }
   </style>
 </head>
 <body>
+  <div class="header no-print">
+    <div class="header-inner">
+      <div class="header-left">
+        <img class="header-logo" src="/logo.png" alt="GEOL Logo" onerror="this.style.display='none'" />
+        <span>Hệ Thống Bảng Lương GEOL</span>
+      </div>
+      <div>
+        <a class="header-link" href="/">Màn hình chính</a>
+      </div>
+    </div>
+  </div>
   <div class="wrap">${content}</div>
 </body>
 </html>`;
@@ -343,55 +358,64 @@ function renderLayout(content, title = "Bảng lương local") {
 
 function renderHomePage() {
   const html = `
-    <div class="card">
-      <h1 class="title">App bảng lương local - Node.js</h1>
-      <p class="muted">Upload file Excel để đọc bảng lương, tự nhận diện cơ sở và tạo phiếu lương cho từng nhân viên.</p>
-
-      <form class="no-print" action="/upload" method="POST" enctype="multipart/form-data">
-        <input type="file" name="excelFile" accept=".xlsx,.xls,.csv" required />
-        <div style="height:12px"></div>
-        <button class="btn" type="submit">Tải file lên</button>
-      </form>
+    <div class="card" style="display: flex; gap: 32px; align-items: center; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 300px;">
+        <h1 class="title" style="font-size: 32px;">Chào mừng đến hệ thống Payroll</h1>
+        <p class="muted" style="margin-bottom: 24px;">Upload tệp tin Excel (.xlsx, .xls) của bạn để phần mềm tiến hành số hóa, định dạng chuẩn và tạo thành các phiếu lương có thể tải xuống dễ dàng.</p>
+        
+        <form class="no-print" action="/upload" method="POST" enctype="multipart/form-data" style="background: #f8fafc; border: 2px dashed #cbd5e1; padding: 24px; border-radius: 12px; text-align: center;">
+          <input type="file" name="excelFile" accept=".xlsx,.xls,.csv" required style="border: none; background: transparent; padding: 0; box-shadow: none;" />
+          <div style="height:16px"></div>
+          <button class="btn btn-blue" type="submit" style="width: 100%;">Tải lên & Xử lý</button>
+        </form>
+      </div>
+      
+      ${FILE_STATE.employees.length ? `
+      <div style="flex: 1; min-width: 300px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px;">
+        <h2 style="margin-top:0; color: #1e3a8a;">Dữ liệu hiện tại</h2>
+        <div style="margin-bottom: 16px;">
+          <div class="muted">Tệp đang xử lý</div>
+          <div style="font-weight: 600; color: #0f172a; font-size: 16px;">${escapeHtml(FILE_STATE.workbookName)}</div>
+        </div>
+        <div style="margin-bottom: 24px;">
+          <div class="muted">Phân vùng Sheet</div>
+          <div style="font-weight: 600; color: #0f172a; font-size: 16px;">${escapeHtml(FILE_STATE.sheetName)}</div>
+        </div>
+        <div class="row no-print">
+          <a class="btn" href="/employees" style="width: 100%; text-align: center;">Vào kho lưu trữ nhân viên</a>
+        </div>
+      </div>
+      ` : `
+      <div style="flex: 1; min-width: 300px; padding: 24px; text-align: center; border: 1px dashed #e2e8f0; border-radius: 16px;">
+        <img src="/logo.png" style="max-height: 100px; opacity: 0.1; margin-bottom: 16px;" onerror="this.style.display='none'">
+        <p class="muted">Chưa có dữ liệu nào được báo cáo.<br>Hãy tải file gốc của bạn lên.</p>
+      </div>
+      `}
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0;">Logic đã áp dụng cho file này</h2>
-      <p class="muted small">
-        Đọc header từ dòng 3 và 4, sau đó tự ghép tên cột.
-        Các dòng bắt đầu bằng “CƠ SỞ ...” ở cột STT sẽ được coi là dòng cơ sở và không tính là nhân viên.
+      <h2 style="margin-top:0; color: #1e3a8a;">Tiêu chuẩn các trường tự động nhận diện</h2>
+      <p class="muted" style="margin-bottom: 20px;">
+        Phần mềm tự động phát hiện hàng tiêu đề từ dòng số 3 và số 4. Tự động nhận biết các CƠ SỞ theo cột STT. Dưới đây là các cột dữ liệu quan trọng đang được ánh xạ xử lý:
       </p>
       <div>
         <span class="pill">Tên</span>
-        <span class="pill">Lương</span>
+        <span class="pill">Lương cơ bản</span>
         <span class="pill">Phụ cấp</span>
         <span class="pill">Thu nhập khác</span>
-        <span class="pill">Thưởng/Sinh nhật</span>
-        <span class="pill">Tăng ca</span>
+        <span class="pill">Thưởng & Sinh nhật</span>
+        <span class="pill">Lương tăng ca</span>
         <span class="pill">Ngày công nghỉ</span>
         <span class="pill">Trừ tạm ứng</span>
         <span class="pill">Trừ đã TT</span>
-        <span class="pill">BHXH, BHYT, BHTN</span>
+        <span class="pill">Bảo hiểm (BHXH, BHYT, BHTN)</span>
         <span class="pill">Thuế TNCN</span>
-        <span class="pill">Thực lĩnh</span>
+        <span class="pill" style="background: #1e3a8a; color: white;">Thực lĩnh</span>
       </div>
     </div>
-
-    ${FILE_STATE.employees.length ? `
-      <div class="card">
-        <h2 style="margin-top:0;">Dữ liệu đã nạp</h2>
-        <p class="muted">
-          File: <strong>${escapeHtml(FILE_STATE.workbookName)}</strong>
-          |
-          Sheet: <strong>${escapeHtml(FILE_STATE.sheetName)}</strong>
-        </p>
-        <div class="row no-print">
-          <a class="btn" href="/employees">Xem danh sách nhân viên</a>
-        </div>
-      </div>
-    ` : ""}
   `;
 
-  return renderLayout(html, "App bảng lương local");
+  return renderLayout(html, "Ứng dụng bảng lương");
 }
 
 function renderEmployeesPage(req) {
@@ -416,37 +440,45 @@ function renderEmployeesPage(req) {
   const totalNetIncome = employees.reduce((sum, item) => sum + item.netIncome, 0);
 
   const html = `
-    <div class="card no-print">
-      <h1 class="title">Danh sách nhân viên</h1>
-      <p class="muted">File: <strong>${escapeHtml(FILE_STATE.workbookName)}</strong></p>
+    <div class="row no-print" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h1 class="title" style="margin: 0;">Quản lý dữ liệu nhân sự</h1>
+        <p class="muted" style="margin: 4px 0 0 0;">Tệp phân tích: <strong>${escapeHtml(FILE_STATE.workbookName)}</strong></p>
+      </div>
+      <div>
+        <a class="btn btn-outline" href="/">Xử lý file mới</a>
+      </div>
+    </div>
 
+    <div class="card no-print">
       <form method="GET" action="/employees" class="grid grid-2">
         <div>
-          <label class="small muted">Tìm theo tên hoặc mã nhân viên</label>
+          <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px;">TÌM KIẾM NHÂN VIÊN</label>
           <input
             type="text"
             name="q"
             value="${escapeHtml(q)}"
-            placeholder="Ví dụ: Trần Thị Hiền hoặc NV00028"
+            placeholder="Nhập tên hoặc mã nhân viên..."
           />
         </div>
 
         <div>
-          <label class="small muted">Lọc theo cơ sở</label>
-          <select name="branch" onchange="this.form.submit()">
-            <option value="">Tất cả cơ sở</option>
-            ${FILE_STATE.branches
-              .map((item) => {
-                const selected = item === branch ? "selected" : "";
-                return `<option value="${escapeHtml(item)}" ${selected}>${escapeHtml(item)}</option>`;
-              })
-              .join("")}
-          </select>
-        </div>
-
-        <div>
-          <button class="btn" type="submit">Lọc dữ liệu</button>
-          <a class="btn btn-outline" href="/employees" style="margin-left:8px;">Xóa lọc</a>
+          <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px;">LỌC THEO CƠ SỞ</label>
+          <div style="display: flex; gap: 12px;">
+            <select name="branch" onchange="this.form.submit()" style="flex: 1;">
+              <option value="">Tất cả các cơ sở</option>
+              ${FILE_STATE.branches
+                .map((item) => {
+                  const selected = item === branch ? "selected" : "";
+                  return `<option value="${escapeHtml(item)}" ${selected}>${escapeHtml(item)}</option>`;
+                })
+                .join("")}
+            </select>
+            <button class="btn btn-blue" type="submit" style="white-space: nowrap;">Lọc</button>
+            <a class="btn btn-outline" href="/employees" title="Xóa bộ lọc" style="padding: 10px; display: flex; align-items: center; justify-content: center;">
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </a>
+          </div>
         </div>
       </form>
     </div>
@@ -525,17 +557,17 @@ function renderSlipPage(employee) {
       </div>
     </div>
 
-    <div id="slip-export-content" style="background: white; padding: 12px 24px; border-radius: 12px; margin-bottom: 24px; font-size: 14px;">
-      <div style="text-align: center; margin-bottom: 12px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">
-        <img src="/logo.png" alt="GEOL Logo" style="max-height: 60px;" onerror="this.style.display='none'" />
-        <h1 class="title" style="margin-top: 8px; color: #0f172a; font-size: 20px;">PHIẾU LƯƠNG NHÂN VIÊN</h1>
+    <div id="slip-export-content" style="background: white; padding: 12px 24px; border-radius: 12px; margin-bottom: 24px; font-size: 14px; font-family: 'Times New Roman', Times, serif, 'Inter', sans-serif;">
+      <div style="text-align: center; margin-bottom: 12px; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px;">
+        <img src="/logo.png" alt="GEOL Logo" style="max-height: 56px;" onerror="this.style.display='none'" />
+        <h1 class="title" style="margin-top: 8px; color: #1e3a8a; font-size: 20px; text-transform: uppercase;">PHIẾU LƯƠNG NHÂN VIÊN</h1>
       </div>
 
       <div style="margin-bottom: 12px;">
         <table style="width: 100%; border: none;">
           <tr>
-            <td style="border: none; padding: 2px 0;"><strong>Họ tên:</strong> ${escapeHtml(employee.name)}</td>
-            <td style="border: none; padding: 2px 0;"><strong>Chức danh:</strong> ${escapeHtml(employee.title)}</td>
+            <td style="border: none; padding: 2px 0; width: 50%;"><strong>Họ tên:</strong> ${escapeHtml(employee.name)}</td>
+            <td style="border: none; padding: 2px 0; width: 50%;"><strong>Chức danh:</strong> ${escapeHtml(employee.title)}</td>
           </tr>
           <tr>
             <td style="border: none; padding: 2px 0;"><strong>Mã nhân viên:</strong> ${escapeHtml(employee.employeeId)}</td>
@@ -544,42 +576,42 @@ function renderSlipPage(employee) {
         </table>
       </div>
 
-      <h3 style="border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 10px; color: #334155; font-size: 16px;">I. CHI TIẾT THU NHẬP VÀ KHẤU TRỪ</h3>
-      <table border="1" style="width: 100%; border-collapse: collapse; border-color: #cbd5e1; margin-bottom: ${employee.otherIncome > 0 ? '16px' : '40px'};">
+      <h3 style="border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 10px; color: #1e3a8a; font-size: 15px; font-weight: bold; text-transform: uppercase;">I. CHI TIẾT THU NHẬP VÀ KHẤU TRỪ</h3>
+      <table border="1" style="width: 100%; border-collapse: collapse; border-color: #94a3b8; margin-bottom: ${employee.otherIncome > 0 ? '16px' : '30px'};">
         <tbody>
-          <tr><td style="padding: 6px; background: #f8fafc; width: 60%;"><strong>Lương</strong></td><td style="padding: 6px; text-align: right;">${money(employee.salary)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;"><strong>Phụ cấp</strong></td><td style="padding: 6px; text-align: right;">${money(employee.allowance)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;"><strong>Thu nhập khác</strong></td><td style="padding: 6px; text-align: right;">${money(employee.otherIncome)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;"><strong>Thưởng/Sinh nhật</strong></td><td style="padding: 6px; text-align: right;">${money(employee.birthdayBonus)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;"><strong>Tăng ca</strong></td><td style="padding: 6px; text-align: right;">${money(employee.overtime)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;"><strong>Ngày công nghỉ</strong></td><td style="padding: 6px; text-align: right;">${escapeHtml(employee.daysOff)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;"><strong>Trừ tháng trước chuyển sang</strong></td><td style="padding: 6px; text-align: right;">${money(employee.previousMonthCarry)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;"><strong>Trừ tạm ứng</strong></td><td style="padding: 6px; text-align: right;">${money(employee.deductionAdvance)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;"><strong>Trừ đã thanh toán</strong></td><td style="padding: 6px; text-align: right;">${money(employee.deductionPaid)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;"><strong>Bảo hiểm Xã hội (BHXH, BHYT, BHTN)</strong></td><td style="padding: 6px; text-align: right;">${money(employee.socialInsurance + employee.healthInsurance + employee.unemploymentInsurance)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;"><strong>Thuế Thu nhập Cá nhân (TNCN)</strong></td><td style="padding: 6px; text-align: right;">${money(employee.pitTax)}</td></tr>
+          <tr><td style="padding: 6px; width: 60%;"><strong>Lương</strong></td><td style="padding: 6px; text-align: right;">${money(employee.salary)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Phụ cấp</strong></td><td style="padding: 6px; text-align: right;">${money(employee.allowance)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Thu nhập khác</strong></td><td style="padding: 6px; text-align: right;">${money(employee.otherIncome)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Thưởng/Sinh nhật</strong></td><td style="padding: 6px; text-align: right;">${money(employee.birthdayBonus)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Tăng ca</strong></td><td style="padding: 6px; text-align: right;">${money(employee.overtime)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Ngày công nghỉ</strong></td><td style="padding: 6px; text-align: right;">${escapeHtml(employee.daysOff)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Trừ tháng trước chuyển sang</strong></td><td style="padding: 6px; text-align: right;">${money(employee.previousMonthCarry)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Trừ tạm ứng</strong></td><td style="padding: 6px; text-align: right;">${money(employee.deductionAdvance)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Trừ đã thanh toán</strong></td><td style="padding: 6px; text-align: right;">${money(employee.deductionPaid)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Bảo hiểm Xã hội (BHXH, BHYT, BHTN)</strong></td><td style="padding: 6px; text-align: right;">${money(employee.socialInsurance + employee.healthInsurance + employee.unemploymentInsurance)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Thuế Thu nhập Cá nhân (TNCN)</strong></td><td style="padding: 6px; text-align: right;">${money(employee.pitTax)}</td></tr>
           <tr>
-            <td style="padding: 8px; background: #0f172a; color: white; font-size: 16px;"><strong>THỰC LĨNH</strong></td>
-            <td style="padding: 8px; text-align: right; background: #0f172a; color: white; font-size: 16px; font-weight: bold;">${money(employee.netIncome)}</td>
+            <td style="padding: 8px; background: #e0e7ff; color: #1e3a8a; font-size: 15px;"><strong>THỰC LĨNH</strong></td>
+            <td style="padding: 8px; text-align: right; background: #e0e7ff; color: #1e3a8a; font-size: 16px; font-weight: bold;">${money(employee.netIncome)}</td>
           </tr>
         </tbody>
       </table>
 
       ${employee.otherIncome > 0 ? `
-      <h3 style="border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 10px; color: #334155; font-size: 16px;">II. CHI TIẾT THU NHẬP KHÁC</h3>
-      <table border="1" style="width: 100%; border-collapse: collapse; border-color: #cbd5e1;">
+      <h3 style="border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 10px; color: #1e3a8a; font-size: 15px; font-weight: bold; text-transform: uppercase;">II. CHI TIẾT THU NHẬP KHÁC</h3>
+      <table border="1" style="width: 100%; border-collapse: collapse; border-color: #94a3b8;">
         <tbody>
-          <tr><td style="padding: 6px; background: #f8fafc; width: 60%;">Hoa hồng tuyển sinh</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.admissionsCommission)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;">Thưởng tết</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.tetBonus)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;">Thưởng chức vụ</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.positionBonus)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;">Học viên bay</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.pilotStudent)}</td></tr>
-          <tr><td style="padding: 6px; background: #f8fafc;">Lương dạy online/trực page</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.onlineTeaching)}</td></tr>
+          <tr><td style="padding: 6px; width: 60%;">Hoa hồng tuyển sinh</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.admissionsCommission)}</td></tr>
+          <tr><td style="padding: 6px;">Thưởng tết</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.tetBonus)}</td></tr>
+          <tr><td style="padding: 6px;">Thưởng chức vụ</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.positionBonus)}</td></tr>
+          <tr><td style="padding: 6px;">Học viên bay</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.pilotStudent)}</td></tr>
+          <tr><td style="padding: 6px;">Lương dạy online/trực page</td><td style="padding: 6px; text-align: right;">${money(employee.otherIncomeBreakdown.onlineTeaching)}</td></tr>
         </tbody>
       </table>
       ` : ''}
       
-      <div style="margin-top: ${employee.otherIncome > 0 ? '20px' : '0'}; text-align: right; font-style: italic; color: #64748b;">
-        Ngày xuất phiếu: ${new Date().toLocaleDateString('vi-VN')}
+      <div style="margin-top: ${employee.otherIncome > 0 ? '16px' : '0'}; text-align: right; font-style: italic; color: #475569;">
+        Hà Nội, Ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}
       </div>
     </div>
 
@@ -587,7 +619,7 @@ function renderSlipPage(employee) {
       function exportPDF() {
         const element = document.getElementById('slip-export-content');
         const opt = {
-          margin:       0.3,
+          margin:       0.25,
           filename:     'Phieu_Luong_${employeeNameSafe}.pdf',
           image:        { type: 'jpeg', quality: 0.98 },
           html2canvas:  { scale: 2 },
@@ -598,10 +630,16 @@ function renderSlipPage(employee) {
 
       function exportWord() {
         const element = document.getElementById('slip-export-content');
+        let htmlContent = element.innerHTML;
+        
+        // Fix image path for Word (convert relative /logo.png to absolute URL so Word can handle it properly online)
+        const absoluteUrl = window.location.origin + '/logo.png';
+        htmlContent = htmlContent.replace(/src="\/logo\.png"/g, 'src="' + absoluteUrl + '"');
+
         // Prepend word schema
         const preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Phiếu Lương</title></head><body>";
         const postHtml = "</body></html>";
-        const html = preHtml + element.innerHTML + postHtml;
+        const html = preHtml + htmlContent + postHtml;
 
         const blob = new Blob(['\\ufeff', html], {
             type: 'application/msword'

@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "express": "^5.2.1",
+    "multer": "^2.1.1",
+    "xlsx": "^0.18.5"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

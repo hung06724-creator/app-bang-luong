@@ -270,6 +270,26 @@ app.get("/slip/:index", (req, res) => {
     return res.status(404).send(renderLayout(`<div class="card"><h2>Không tìm thấy nhân viên</h2><a class="btn" href="/employees">Quay lại</a></div>`));
   }
 
+  const shouldShow = (value) => {
+    if (value === 0 || value === "0" || value === "" || value == null) return false;
+    return true;
+  };
+
+  const fields = [
+    { label: "Tên", value: employee.name, forceShow: true },
+    { label: "Lương", value: money(employee.salary), forceShow: true },
+    { label: "Phụ cấp", value: money(employee.allowance), raw: employee.allowance },
+    { label: "Thu nhập khác", value: money(employee.otherIncome), raw: employee.otherIncome },
+    { label: "Thưởng/Sinh nhật", value: money(employee.birthdayBonus), raw: employee.birthdayBonus },
+    { label: "Tăng ca", value: money(employee.overtime), raw: employee.overtime },
+    { label: "Ngày công nghỉ", value: employee.daysOff, raw: employee.daysOff },
+    { label: "Trừ tạm ứng", value: money(employee.advanceDeduction), raw: employee.advanceDeduction },
+    { label: "Trừ đã TT", value: money(employee.paidDeduction), raw: employee.paidDeduction },
+    { label: "BHXH", value: money(employee.socialInsurance), raw: employee.socialInsurance },
+    { label: "Thuế TNCN", value: money(employee.pitTax), raw: employee.pitTax },
+    { label: "Thực lĩnh", value: money(employee.netIncome), forceShow: true, isNet: true }
+  ];
+
   const html = `
     <div class="card">
       <div class="actions no-print">
@@ -283,18 +303,15 @@ app.get("/slip/:index", (req, res) => {
       <p>Nhân viên: <strong>${employee.name}</strong></p>
 
       <div class="grid grid-2">
-        <div class="item"><div class="label">Tên</div><div class="value">${employee.name}</div></div>
-        <div class="item"><div class="label">Lương</div><div class="value">${money(employee.salary)}</div></div>
-        <div class="item"><div class="label">Phụ cấp</div><div class="value">${money(employee.allowance)}</div></div>
-        <div class="item"><div class="label">Thu nhập khác</div><div class="value">${money(employee.otherIncome)}</div></div>
-        <div class="item"><div class="label">Thưởng/Sinh nhật</div><div class="value">${money(employee.birthdayBonus)}</div></div>
-        <div class="item"><div class="label">Tăng ca</div><div class="value">${money(employee.overtime)}</div></div>
-        <div class="item"><div class="label">Ngày công nghỉ</div><div class="value">${employee.daysOff || 0}</div></div>
-        <div class="item"><div class="label">Trừ tạm ứng</div><div class="value">${money(employee.advanceDeduction)}</div></div>
-        <div class="item"><div class="label">Trừ đã TT</div><div class="value">${money(employee.paidDeduction)}</div></div>
-        <div class="item"><div class="label">BHXH</div><div class="value">${money(employee.socialInsurance)}</div></div>
-        <div class="item"><div class="label">Thuế TNCN</div><div class="value">${money(employee.pitTax)}</div></div>
-        <div class="item" style="background:#0f172a;color:white;"><div class="label" style="color:#cbd5e1;">Thực lĩnh</div><div class="value" style="font-size:24px;">${money(employee.netIncome)}</div></div>
+        ${fields
+          .filter(f => f.forceShow || shouldShow(f.raw))
+          .map(f => {
+            if (f.isNet) {
+              return `<div class="item" style="background:#0f172a;color:white;"><div class="label" style="color:#cbd5e1;">${f.label}</div><div class="value" style="font-size:24px;">${f.value}</div></div>`;
+            }
+            return `<div class="item"><div class="label">${f.label}</div><div class="value">${f.value}</div></div>`;
+          })
+          .join("")}
       </div>
     </div>
   `;

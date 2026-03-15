@@ -586,7 +586,7 @@ function renderSlipPage(employee) {
           <tr><td style="padding: 6px;"><strong>Tăng ca</strong></td><td style="padding: 6px; text-align: right;">${money(employee.overtime)}</td></tr>
           <tr><td style="padding: 6px;"><strong>Ngày công nghỉ</strong></td><td style="padding: 6px; text-align: right;">${escapeHtml(employee.daysOff)}</td></tr>
           <tr><td style="padding: 6px;"><strong>Trừ tháng trước chuyển sang</strong></td><td style="padding: 6px; text-align: right;">${money(employee.previousMonthCarry)}</td></tr>
-          <tr><td style="padding: 6px;"><strong>Trừ tạm ứng</strong></td><td style="padding: 6px; text-align: right;">${money(employee.deductionAdvance)}</td></tr>
+          <tr><td style="padding: 6px;"><strong>Trừ tạm ứng</strong></td><td style="padding: 6px; text-align: right;">${money(employee.deductionPaid)}</td></tr>
           <tr><td style="padding: 6px;"><strong>Trừ đã thanh toán</strong></td><td style="padding: 6px; text-align: right;">${money(employee.deductionPaid)}</td></tr>
           <tr><td style="padding: 6px;"><strong>Bảo hiểm Xã hội (BHXH, BHYT, BHTN)</strong></td><td style="padding: 6px; text-align: right;">${money(employee.socialInsurance + employee.healthInsurance + employee.unemploymentInsurance)}</td></tr>
           <tr><td style="padding: 6px;"><strong>Thuế Thu nhập Cá nhân (TNCN)</strong></td><td style="padding: 6px; text-align: right;">${money(employee.pitTax)}</td></tr>

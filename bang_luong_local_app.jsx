@@ -290,7 +290,7 @@ app.get("/slip/:index", (req, res) => {
         <div class="item"><div class="label">Thưởng/Sinh nhật</div><div class="value">${money(employee.birthdayBonus)}</div></div>
         <div class="item"><div class="label">Tăng ca</div><div class="value">${money(employee.overtime)}</div></div>
         <div class="item"><div class="label">Ngày công nghỉ</div><div class="value">${employee.daysOff || 0}</div></div>
-        <div class="item"><div class="label">Trừ tạm ứng</div><div class="value">${money(employee.advanceDeduction)}</div></div>
+        <div class="item"><div class="label">Trừ tạm ứng</div><div class="value">${money(employee.paidDeduction)}</div></div>
         <div class="item"><div class="label">Trừ đã TT</div><div class="value">${money(employee.paidDeduction)}</div></div>
         <div class="item"><div class="label">BHXH</div><div class="value">${money(employee.socialInsurance)}</div></div>
         <div class="item"><div class="label">Thuế TNCN</div><div class="value">${money(employee.pitTax)}</div></div>

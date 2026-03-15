@@ -609,31 +609,13 @@ function renderEmployeesPage(req) {
             var fileName = buildFileName(employeeNames[i], month, year, type === 'pdf' ? 'pdf' : 'doc');
 
             if (type === 'pdf') {
-              var container = document.createElement('div');
-              container.innerHTML = slipHtml;
-              container.style.position = 'fixed';
-              container.style.left = '0';
-              container.style.top = '0';
-              container.style.width = '210mm';
-              container.style.zIndex = '-9999';
-              container.style.pointerEvents = 'none';
-              document.body.appendChild(container);
-
-              var imgs = container.querySelectorAll('img');
-              await Promise.all(Array.from(imgs).map(function(img) {
-                return img.complete ? Promise.resolve() : new Promise(function(r) { img.onload = r; img.onerror = r; });
-              }));
-              await new Promise(function(r) { requestAnimationFrame(function() { setTimeout(r, 300); }); });
-
               await html2pdf().set({
                 margin: 0.25,
                 filename: fileName,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
+                html2canvas: { scale: 2 },
                 jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-              }).from(container).save();
-
-              document.body.removeChild(container);
+              }).from(slipHtml, 'string').save();
             } else {
               var preHtml = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Phieu Luong</title></head><body>";
               var postHtml = "</body></html>";

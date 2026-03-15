@@ -615,6 +615,13 @@ function renderEmployeesPage(req) {
             container.style.pointerEvents = 'none';
             document.body.appendChild(container);
 
+            // Wait for browser to render + images to load
+            var imgs = container.querySelectorAll('img');
+            await Promise.all(Array.from(imgs).map(function(img) {
+              return img.complete ? Promise.resolve() : new Promise(function(r) { img.onload = r; img.onerror = r; });
+            }));
+            await new Promise(function(r) { requestAnimationFrame(function() { setTimeout(r, 200); }); });
+
             var fileName = buildFileName(employeeNames[i], month, year, type === 'pdf' ? 'pdf' : 'doc');
 
             if (type === 'pdf') {
